@@ -18,7 +18,10 @@ import sys
 import json
 from dotenv import load_dotenv
 
-from langchain_openai import ChatOpenAI
+try:
+    from langchain_openai import ChatOpenAI
+except ImportError:  # sandbox
+    from llm_shim import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -375,6 +378,11 @@ def run_evaluation(test_cases: list = None, verbose: bool = False) -> dict:
     """Run query decomposition evaluation on all test cases."""
     if test_cases is None:
         test_cases = TEST_CASES
+    cap = os.getenv("EVAL_MAX_CASES", "").strip()  # empty or unset runs every case
+    if cap:
+        if not cap.isdigit() or int(cap) <= 0:
+            raise SystemExit(f"EVAL_MAX_CASES must be a positive integer, or empty for all cases (got {cap!r})")
+        test_cases = test_cases[: int(cap)]
     
     print("=" * 60)
     print("Agentic RAG - Query Decomposition Evaluation")

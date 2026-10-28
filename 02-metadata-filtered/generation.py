@@ -13,7 +13,10 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 
-from langchain_openai import ChatOpenAI
+try:
+    from langchain_openai import ChatOpenAI
+except ImportError:  # sandbox
+    from llm_shim import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 

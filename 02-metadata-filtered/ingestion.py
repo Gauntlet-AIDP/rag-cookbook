@@ -22,15 +22,26 @@ from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+try:
+    from langchain_openai import OpenAIEmbeddings
+except ImportError:  # sandbox
+    from llm_shim import OpenAIEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo import MongoClient
+
+try:
+    from llm_shim import ensure_vector_index  # sandbox only: creates the index Atlas UI would
+except ImportError:
+    ensure_vector_index = None
 
 # Load environment variables
 load_dotenv()
 
 # Configuration
 MONGO_DB_URL = os.getenv("MONGO_DB_URL")
+# Atlas (mongodb+srv, mongodb.net or tls/ssl=true) needs the certifi CA bundle; a plain local URL does not
+_TLS_HINTS = ("mongodb+srv", "mongodb.net", "tls=true", "ssl=true")
+MONGO_KWARGS = {"tlsCAFile": certifi.where()} if any(h in (MONGO_DB_URL or "").lower() for h in _TLS_HINTS) else {}
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # MongoDB configuration
@@ -399,7 +410,7 @@ def load_and_chunk_pdfs_with_metadata(pdf_files: list[Path]) -> list:
 
 def setup_mongodb_collection():
     """Set up MongoDB collection for vector storage."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     db = client[DB_NAME]
     
     # Create collection if it doesn't exist
@@ -581,7 +592,14 @@ def main():
         print(f"   Documents stored: {len(documents)}")
         
         # Print instructions for creating the vector search index
-        print_vector_search_index_instructions()
+        if ensure_vector_index:
+            ensure_vector_index(
+                collection,
+                INDEX_NAME,
+                filter_fields=["year", "decade", "source_file", "has_financials", "topic_buckets", "companies_mentioned"],
+            )
+        else:
+            print_vector_search_index_instructions()
         
     finally:
         client.close()

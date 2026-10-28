@@ -1,0 +1,8 @@
+.env
+claude-helper/.token
+claude-helper/claude-helper
+relay/relay
+.manual
+out
+faiss_index
+*.log

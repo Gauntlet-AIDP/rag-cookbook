@@ -10,7 +10,10 @@ import certifi
 from dotenv import load_dotenv
 from typing import Optional
 
-from langchain_openai import OpenAIEmbeddings
+try:
+    from langchain_openai import OpenAIEmbeddings
+except ImportError:  # sandbox
+    from llm_shim import OpenAIEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_core.documents import Document
 from pymongo import MongoClient
@@ -20,6 +23,9 @@ load_dotenv()
 
 # Configuration
 MONGO_DB_URL = os.getenv("MONGO_DB_URL")
+# Atlas (mongodb+srv, mongodb.net or tls/ssl=true) needs the certifi CA bundle; a plain local URL does not
+_TLS_HINTS = ("mongodb+srv", "mongodb.net", "tls=true", "ssl=true")
+MONGO_KWARGS = {"tlsCAFile": certifi.where()} if any(h in (MONGO_DB_URL or "").lower() for h in _TLS_HINTS) else {}
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # MongoDB configuration - uses metadata_filtered collection by default
@@ -30,7 +36,7 @@ INDEX_NAME = "metadata_filtered_index"
 
 def get_mongo_client():
     """Get MongoDB client."""
-    return MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    return MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
 
 
 def get_vector_store():

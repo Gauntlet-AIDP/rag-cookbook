@@ -15,7 +15,10 @@ import json
 from dotenv import load_dotenv
 from typing import Optional
 
-from langchain_openai import ChatOpenAI
+try:
+    from langchain_openai import ChatOpenAI
+except ImportError:  # sandbox
+    from llm_shim import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -33,7 +36,7 @@ load_dotenv()
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 AGENT_MODEL = "gpt-4o-mini"
-MAX_ITERATIONS = 3  # Maximum retrieval attempts per sub-question
+MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "3"))  # Maximum retrieval attempts per sub-question
 
 
 # =============================================================================

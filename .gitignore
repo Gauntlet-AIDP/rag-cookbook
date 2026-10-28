@@ -9,3 +9,11 @@ venv/
 
 __pycache__/
 .DS_Store
+
+# Sandbox: secrets, local binaries, manual-mode cache, logs
+sandbox/.env
+sandbox/claude-helper/.token
+sandbox/claude-helper/claude-helper
+sandbox/relay/relay
+.manual/
+*.log

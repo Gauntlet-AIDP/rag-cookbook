@@ -1,0 +1,86 @@
+name: rag-sandbox
+
+services:
+  mongo:
+    image: mongodb/mongodb-atlas-local:8.3.13-20261027T181252Z@sha256:801c1482297e43da93d5f47384794cebb000820428b4d5a4bd4314378afe9f69
+    environment:
+      DO_NOT_TRACK: "1"
+    # cap_drop is not set: the Atlas Local entrypoint has not been verified to start without its default capabilities
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping:1}).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+    networks: [lab]
+
+  neo4j:
+    image: neo4j:5.26.32@sha256:22dfc37fafb18c8f8cdb36293d82cef0ae4bf21bef31efa20f16f25394a580f8
+    user: "7474:7474"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1536m
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7474"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+    networks: [lab]
+
+  claude-relay:
+    build: ./relay
+    image: rag-sandbox-relay:local
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 64
+    networks: [lab, egress]
+
+  app:
+    build: .
+    image: rag-sandbox-app:local
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 6g
+    pids_limit: 512
+    tmpfs:
+      - /tmp:size=512m # scratch and caches; the root filesystem is read-only
+    env_file: .env
+    environment:
+      HF_HOME: /tmp/hf
+      XDG_CACHE_HOME: /tmp/.cache
+    depends_on:
+      mongo:
+        condition: service_healthy
+      claude-relay:
+        condition: service_started
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./shim:/shim:ro
+      # Module code, read-only.
+      - ../01-naive-rag:/work/01-naive-rag:ro
+      - ../02-metadata-filtered:/work/02-metadata-filtered:ro
+      - ../03-hybrid-search:/work/03-hybrid-search:ro
+      - ../04-graph-rag:/work/04-graph-rag:ro
+      - ../05-agentic-rag:/work/05-agentic-rag:ro
+      - ../letters:/work/letters:ro
+      # Only writable path under /work: manual-mode prompts and the reply cache.
+      - ../.manual:/work/.manual
+    working_dir: /work
+    networks: [lab]
+
+networks:
+  lab:
+    internal: true
+  egress: {}
