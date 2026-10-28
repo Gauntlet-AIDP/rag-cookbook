@@ -2,6 +2,8 @@
 
 A hands-on guide to Retrieval-Augmented Generation (RAG) patterns, progressing from simple to sophisticated implementations.
 
+To run the modules locally with no cloud accounts or API keys, see [sandbox/README.md](sandbox/README.md).
+
 ## What You'll Build
 
 Using **Warren Buffett's Berkshire Hathaway shareholder letters** (2004-2023) as your corpus, you'll implement 5 increasingly complex RAG patterns:

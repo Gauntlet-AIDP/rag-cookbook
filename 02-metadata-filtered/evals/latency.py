@@ -18,7 +18,10 @@ import certifi
 from dotenv import load_dotenv
 from typing import Optional
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+try:
+    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+except ImportError:  # sandbox
+    from llm_shim import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_mongodb import MongoDBAtlasVectorSearch
@@ -32,6 +35,9 @@ load_dotenv()
 
 # Configuration
 MONGO_DB_URL = os.getenv("MONGO_DB_URL")
+# Atlas (mongodb+srv, mongodb.net or tls/ssl=true) needs the certifi CA bundle; a plain local URL does not
+_TLS_HINTS = ("mongodb+srv", "mongodb.net", "tls=true", "ssl=true")
+MONGO_KWARGS = {"tlsCAFile": certifi.where()} if any(h in (MONGO_DB_URL or "").lower() for h in _TLS_HINTS) else {}
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # MongoDB configuration
@@ -113,7 +119,7 @@ LATENCY_TEST_CASES = [
 
 def get_vector_store():
     """Connect to the MongoDB vector store."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     collection = client[DB_NAME][COLLECTION_NAME]
     
     embeddings = OpenAIEmbeddings(
@@ -305,6 +311,11 @@ def run_latency_evaluation(
     """
     if test_cases is None:
         test_cases = LATENCY_TEST_CASES
+    cap = os.getenv("EVAL_MAX_CASES", "").strip()  # empty or unset runs every case
+    if cap:
+        if not cap.isdigit() or int(cap) <= 0:
+            raise SystemExit(f"EVAL_MAX_CASES must be a positive integer, or empty for all cases (got {cap!r})")
+        test_cases = test_cases[: int(cap)]
     
     print("=" * 60)
     print("Metadata-Filtered RAG - Latency Evaluation")

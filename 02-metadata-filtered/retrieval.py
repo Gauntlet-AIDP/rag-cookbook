@@ -17,7 +17,10 @@ import certifi
 from dotenv import load_dotenv
 from typing import Optional
 
-from langchain_openai import OpenAIEmbeddings
+try:
+    from langchain_openai import OpenAIEmbeddings
+except ImportError:  # sandbox
+    from llm_shim import OpenAIEmbeddings
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo import MongoClient
 
@@ -26,6 +29,9 @@ load_dotenv()
 
 # Configuration
 MONGO_DB_URL = os.getenv("MONGO_DB_URL")
+# Atlas (mongodb+srv, mongodb.net or tls/ssl=true) needs the certifi CA bundle; a plain local URL does not
+_TLS_HINTS = ("mongodb+srv", "mongodb.net", "tls=true", "ssl=true")
+MONGO_KWARGS = {"tlsCAFile": certifi.where()} if any(h in (MONGO_DB_URL or "").lower() for h in _TLS_HINTS) else {}
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # MongoDB configuration (must match ingestion.py)
@@ -56,7 +62,7 @@ AVAILABLE_COMPANIES = [
 
 def get_vector_store():
     """Connect to the MongoDB vector store."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     collection = client[DB_NAME][COLLECTION_NAME]
     
     embeddings = OpenAIEmbeddings(
@@ -291,7 +297,7 @@ def format_retrieved_context(documents: list) -> str:
 
 def get_available_years():
     """Get list of years available in the collection."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     collection = client[DB_NAME][COLLECTION_NAME]
     
     try:
@@ -303,7 +309,7 @@ def get_available_years():
 
 def get_topic_counts():
     """Get counts of each topic bucket in the collection."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     collection = client[DB_NAME][COLLECTION_NAME]
     
     try:
@@ -320,7 +326,7 @@ def get_topic_counts():
 
 def get_company_counts():
     """Get counts of company mentions in the collection."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     collection = client[DB_NAME][COLLECTION_NAME]
     
     try:
@@ -337,7 +343,7 @@ def get_company_counts():
 
 def debug_collection():
     """Debug function to check MongoDB collection status."""
-    client = MongoClient(MONGO_DB_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_DB_URL, **MONGO_KWARGS)
     collection = client[DB_NAME][COLLECTION_NAME]
     
     print("=" * 50)
